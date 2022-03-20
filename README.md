@@ -28,15 +28,19 @@ Eg: `/xdcc irc.xertion.org,MK /msg Rory|XDCC xdcc send #22969`
 Default server is `irc.rizon.net`
 
 ## Onedrive
-- Added recursive downloading from given url for certain onedrive indexes
-- Currently supported mirrors - (Can't find github page for it)
+- Added support for both normal and recursive downloading from onedrive
 
-##### To Do
-```
-- [ ] Add support more indexes
-- [ ] Add proper help
-- [ ] Add proper error handling
-```
+### Working links types
+
+`https://<some>.sharepoint.com/:v:/g/personal/<some_email>/<some_id>?e=<some_code>` - Video link
+
+`https://<some>.sharepoint.com/:f:/g/personal/<some_email>/<some_id>?e=<some_code>` - Folder link
+
+`https://1drv.ms/u/s!<some_id>` - File link maybe(?)
+
+#### To Do
+- Check for more link schema (?)
+- Add proper error handling maybe (?)
 
 ## Fembed
 - Added downloading from fembed-like websites - https://fembed.com/

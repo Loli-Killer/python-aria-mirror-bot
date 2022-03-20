@@ -19,7 +19,11 @@ class AriaQueue:
         self.queue_length = len(links)
         self.current_download = 0
 
-        self.base_path = base_path
+        if isinstance(base_path, str):
+            base_path_dict = [base_path for i in range(len(links))]
+            self.base_path = (path for path in base_path_dict)
+        else:
+            self.base_path = (path for path in base_path)
         self.aria_options = aria_options
 
 
@@ -113,15 +117,16 @@ class AriaDownloadHelper(DownloadHelper):
 
         queue = self.queue_dict[uid]
         entry = next(queue.queue)
+        base_path = next(queue.base_path)
         queue.current_download += 1
         aria_options = queue.aria_options
         if isinstance(entry, dict):
-            aria_options.update({'dir': queue.base_path + entry["folder_path"]})
+            aria_options.update({'dir': base_path + entry["folder_path"]})
             if 'file_name' in entry.keys():
                 aria_options.update({'out': entry['file_name']})
             link = entry['url']
         else:
-            aria_options.update({'dir': queue.base_path})
+            aria_options.update({'dir': base_path})
             link = entry
 
         if is_magnet(link):

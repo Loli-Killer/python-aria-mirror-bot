@@ -185,7 +185,7 @@ class GoogleDriveHelper:
         if USE_SERVICE_ACCOUNTS:
             self.service_account_count = len(os.listdir("accounts"))
         self.__listener.onUploadStarted()
-        file_dir = f"{DOWNLOAD_DIR}{self.__listener.message.message_id}"
+        file_dir = f"{DOWNLOAD_DIR}{self.__listener.uid}"
         file_path = f"{file_dir}/{file_name}"
         LOGGER.info("Uploading File: " + file_path)
         self.start_time = time.time()
