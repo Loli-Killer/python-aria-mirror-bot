@@ -30,6 +30,8 @@ Default server is `irc.rizon.net`
 ## Onedrive
 - Added support for both normal and recursive downloading from onedrive
 
+Usage: `/onedrive <link>`
+
 ### Working links types
 
 `https://<some>.sharepoint.com/:v:/g/personal/<some_email>/<some_id>?e=<some_code>` - Video link
