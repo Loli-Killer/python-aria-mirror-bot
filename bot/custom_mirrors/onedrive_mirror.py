@@ -31,7 +31,8 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
             "renderListDataAsStreamQueryString": f"@a1='{baseEncodedPath}'&RootFolder={fullEncodedPath}"
         }
     }
-    graphqlUrl = f"https://pb82-my.sharepoint.com{unquote(fullEncodedPath.split(r'%2FDocuments%2F')[0])}/_api/v2.1/graphql"
+    topBaseUrl = baseUrl.split("//", 1)[1].split("/", 1)[0]
+    graphqlUrl = f"https://{topBaseUrl}{unquote(fullEncodedPath.split(r'%2FDocuments%2F')[0])}/_api/v2.1/graphql"
     headers = {
         'Content-Type': 'application/json'
     }
