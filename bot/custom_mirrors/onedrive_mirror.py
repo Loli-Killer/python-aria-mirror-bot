@@ -1,6 +1,6 @@
 import re
 import json
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 import requests
 from telegram.ext import CommandHandler, run_async
@@ -31,7 +31,7 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
             "renderListDataAsStreamQueryString": f"@a1='{baseEncodedPath}'&RootFolder={fullEncodedPath}"
         }
     }
-    topBaseUrl = baseUrl.split("//", 1)[1].split("/", 1)[0]
+    topBaseUrl = urlparse(baseUrl).netloc
     graphqlUrl = f"https://{topBaseUrl}{unquote(fullEncodedPath.split(r'%2FDocuments%2F')[0])}/_api/v2.1/graphql"
     headers = {
         'Content-Type': 'application/json'
