@@ -42,13 +42,13 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
     dlLinks = []
     for eachFile in fileList:
 
-        newBaseFolder = folder + "%2F" + eachFile["LinkFilename"]
-        dlUrl = baseUrl.split("onedrive.aspx?id=")[0] + "download.aspx?SourceUrl=" + eachFile["FileRef.urlencode"]
         isFolder = bool(eachFile[".fileType"])
 
         if not isFolder:
+            newBaseFolder = folder + "%2F" + eachFile["LinkFilename"]
             dlLinks = dlLinks + fetchChildren(newBaseFolder, cookies, baseUrl)
         else:
+            dlUrl = baseUrl.split("onedrive.aspx?id=")[0] + "download.aspx?SourceUrl=" + eachFile["FileRef.urlencode"]
             dlLinks.append({
                 "filePath": unquote(folder).encode('ascii', errors='ignore').decode(),
                 "url": dlUrl
