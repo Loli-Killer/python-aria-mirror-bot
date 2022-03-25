@@ -36,8 +36,26 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
     headers = {
         'Content-Type': 'application/json'
     }
+    fileList = []
+
     post_r = requests.post(graphqlUrl, data=json.dumps(body), headers=headers, cookies=cookies).json()
-    fileList = post_r["data"]["legacy"]["renderListDataAsStream"]["ListData"]["Row"]
+    fileList += post_r["data"]["legacy"]["renderListDataAsStream"]["ListData"]["Row"]
+    newData = post_r["data"]["legacy"]["renderListDataAsStream"]["ListData"]
+
+    while "NextHref" in newData.keys():
+        href = newData["NextHref"][1:]
+        nextUrl = f"https://{topBaseUrl}{unquote(fullEncodedPath.split(r'%2FDocuments%2F')[0])}/_api/web/GetListUsingPath(DecodedUrl=@a1)/RenderListDataAsStream?@a1=%27{baseEncodedPath}%27&TryNewExperienceSingle=TRUE&{href}"
+        nextBody = {
+            "parameters": {
+                "RenderOptions": 1216519,
+                "ViewXml": "<View Name=\"{56DB6481-F042-4774-9F8B-5535823A23FE}\" DefaultView=\"TRUE\" MobileView=\"TRUE\" MobileDefaultView=\"TRUE\" Type=\"HTML\" ReadOnly=\"TRUE\" DisplayName=\"All\" Url=\"/personal/kimberlysmith_zh_igph_org/Documents/Forms/All.aspx\" Level=\"1\" BaseViewID=\"51\" ContentTypeID=\"0x\" ImageUrl=\"/_layouts/15/images/dlicon.png?rev=47\"><Query><OrderBy><FieldRef Name=\"FileLeafRef\"/></OrderBy></Query><ViewFields><FieldRef Name=\"DocIcon\"/><FieldRef Name=\"LinkFilename\"/><FieldRef Name=\"Modified\"/><FieldRef Name=\"SharedWith\"/><FieldRef Name=\"Editor\"/></ViewFields><RowLimit Paged=\"TRUE\">70</RowLimit><JSLink>clienttemplates.js</JSLink><XslLink Default=\"TRUE\">main.xsl</XslLink><Toolbar Type=\"Standard\"/></View>",
+                "AllowMultipleValueFilterForTaxonomyFields": True,
+                "AddRequiredFields": True
+            }
+        }
+        post_r = requests.post(nextUrl, data=json.dumps(nextBody), headers=headers, cookies=cookies).json()
+        fileList += post_r["ListData"]["Row"]
+        newData = post_r["ListData"]
     
     dlLinks = []
     for eachFile in fileList:
@@ -45,7 +63,7 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
         isFolder = bool(eachFile[".fileType"])
 
         if not isFolder:
-            newBaseFolder = folder + "%2F" + eachFile["LinkFilename"]
+            newBaseFolder = eachFile["FileRef.urlencode"]
             dlLinks = dlLinks + fetchChildren(newBaseFolder, cookies, baseUrl)
         else:
             dlUrl = baseUrl.split("onedrive.aspx?id=")[0] + "download.aspx?SourceUrl=" + eachFile["FileRef.urlencode"]
