@@ -68,6 +68,7 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
         else:
             dlUrl = baseUrl.split("onedrive.aspx?id=")[0] + "download.aspx?SourceUrl=" + eachFile["FileRef.urlencode"]
             dlLinks.append({
+                "fileName": eachFile["FileLeafRef"],
                 "filePath": unquote(folder).encode('ascii', errors='ignore').decode(),
                 "url": dlUrl
             })
@@ -112,9 +113,8 @@ def mirror_onedrive(update, context):
 
             listener = MirrorListener(bot, update, False, tag, False, rootFolder)
             basePath = f'{DOWNLOAD_DIR}/{listener.uid}/{rootFolder}'
-            pathDict = [f'{basePath}{item["filePath"]}/' for item in childrenItems]
-            urlDict = [item["url"] for item in childrenItems]
-            ariaDlManager.add_download(pathDict, urlDict, listener, ariaOptions)
+            ariaDlManager.add_download(basePath, childrenItems, listener, ariaOptions)
+
 
     else:
         download = first_r.history[1].url
