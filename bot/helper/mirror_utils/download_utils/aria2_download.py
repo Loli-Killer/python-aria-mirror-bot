@@ -1,5 +1,5 @@
 import threading
-from time import sleep
+from time import sleep, time
 
 from aria2p import API
 
@@ -9,9 +9,32 @@ from bot.helper.mirror_utils.download_utils.download_helper import DownloadHelpe
 from bot.helper.mirror_utils.status_utils.aria_download_status import AriaDownloadStatus
 from bot.helper.telegram_helper.message_utils import update_all_messages
 
+
+def genpacks(packstr):
+    """It is a generator that returns it pack number describe by some string on
+    the format like '50-62,13,14,70-80'.
+
+    Args:
+        packstr(str): A string describing the range of packs
+    Yields:
+        int: The numeric pack of the next file to be downloaded.
+    """
+    l = packstr.split(",")
+    for p in l:
+        r = list(map(int, p.split("-")))
+        try:
+            s, e = r
+        except ValueError:
+            s = r[0]
+            e = r[0]
+        # raise error here
+        for k in range(s, e + 1):
+            yield k
+
+
 class AriaQueue:
 
-    def __init__(self, base_path, listener, links, aria_options):
+    def __init__(self, base_path, listener, links, aria_options, delayTime, partsToDownload):
         self.listener = listener
         self.name = ""
 
@@ -21,6 +44,14 @@ class AriaQueue:
 
         self.base_path = base_path
         self.aria_options = aria_options
+
+        self.delayTime = delayTime
+        self.lastRunTime = 0
+
+        self.partsToDownload = genpacks(f"1-{self.queue_length}")
+        if partsToDownload:
+            self.queue_length = len([length for length in genpacks(partsToDownload)])
+            self.partsToDownload = genpacks(partsToDownload)
 
 
 class AriaDownloadHelper(DownloadHelper):
@@ -115,6 +146,26 @@ class AriaDownloadHelper(DownloadHelper):
         entry = next(queue.queue)
         queue.current_download += 1
         aria_options = queue.aria_options
+
+        try:
+            nextPart = next(queue.partsToDownload)
+        except StopIteration:
+            threading.Thread(target=queue.listener.onDownloadComplete).start()
+            return
+        
+        while nextPart < queue.current_download:
+            entry = next(queue.queue)
+            queue.current_download += 1
+
+        if queue.delayTime:
+            currentTime = time()
+            if queue.lastRunTime:
+                waitTime = currentTime - queue.lastRunTime
+                if waitTime < queue.delayTime:
+                    sleep(waitTime)
+
+            queue.lastRunTime = currentTime
+
         if isinstance(entry, dict):
             aria_options.update({'dir': queue.base_path + entry["filePath"]})
             if 'file_name' in entry.keys():
@@ -139,7 +190,15 @@ class AriaDownloadHelper(DownloadHelper):
         LOGGER.info(f"Started: {download.gid} DIR:{download.dir} ")
 
 
-    def add_download(self, base_path: str, links, listener, aria_options: dict = {}):
+    def add_download(
+        self,
+        base_path: str,
+        links,
+        listener,
+        aria_options: dict = {},
+        delayTime: int = 0,
+        partsToDownload: str = ""
+    ):
 
-        self.queue_dict[listener.uid] = AriaQueue(base_path, listener, links, aria_options)
+        self.queue_dict[listener.uid] = AriaQueue(base_path, listener, links, aria_options, delayTime, partsToDownload)
         self.__startNextDownload(listener.uid)

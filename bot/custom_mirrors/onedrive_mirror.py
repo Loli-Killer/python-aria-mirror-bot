@@ -1,5 +1,6 @@
 import re
 import json
+from time import sleep
 from urllib.parse import unquote
 
 import requests
@@ -56,6 +57,7 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
         post_r = requests.post(nextUrl, data=json.dumps(nextBody), headers=headers, cookies=cookies).json()
         fileList += post_r["ListData"]["Row"]
         newData = post_r["ListData"]
+        sleep(1)
     
     dlLinks = []
     for eachFile in fileList:
@@ -64,7 +66,7 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
 
         if not isFolder:
             newBaseFolder = eachFile["FileRef.urlencode"]
-            dlLinks = dlLinks + fetchChildren(newBaseFolder, cookies, baseUrl)
+            dlLinks = dlLinks + fetchChildren(newBaseFolder, cookies, baseUrl, folder + "/" + eachFile["FileLeafRef"])
         else:
             dlUrl = baseUrl.split("onedrive.aspx?id=")[0] + "download.aspx?SourceUrl=" + eachFile["FileRef.urlencode"]
             dlLinks.append({
@@ -84,6 +86,11 @@ def mirror_onedrive(update, context):
         link = message_args[1]
     except IndexError:
         link = ''
+
+    try:
+        part = message_args[2]
+    except IndexError:
+        part = ''
 
     LOGGER.info(link)
     link = link.strip()
@@ -113,7 +120,7 @@ def mirror_onedrive(update, context):
 
             listener = MirrorListener(bot, update, False, tag, False, rootFolder)
             basePath = f'{DOWNLOAD_DIR}/{listener.uid}/{rootFolder}'
-            ariaDlManager.add_download(basePath, childrenItems, listener, ariaOptions)
+            ariaDlManager.add_download(basePath, childrenItems, listener, ariaOptions, 5, part)
 
 
     else:
