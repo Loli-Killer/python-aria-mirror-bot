@@ -30,7 +30,11 @@ Default server is `irc.rizon.net`
 ## Onedrive
 - Added support for both normal and recursive downloading from onedrive
 
-Usage: `/onedrive <link>`
+Usage: `/onedrive <link> [password] [parts to download]`
+
+Eg: `/onedrive <link> password`
+
+Eg2: `/onedrive <link> randomtext 10-15` (Fill any word as password if you just want to use parts downloading but the link isn't password-protected)
 
 ### Working links types
 

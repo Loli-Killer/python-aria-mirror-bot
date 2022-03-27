@@ -1,9 +1,10 @@
 import re
 import json
 from time import sleep
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 import requests
+from bs4 import BeautifulSoup
 from telegram.ext import CommandHandler, run_async
 
 from bot import Interval, LOGGER, dispatcher, DOWNLOAD_DIR, DOWNLOAD_STATUS_UPDATE_INTERVAL
@@ -16,32 +17,24 @@ from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMess
 def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
 
     baseEncodedPath = fullEncodedPath.split(r"%2FDocuments%2F")[0] + r"%2FDocuments"
-    fullPath = unquote(fullEncodedPath)
-    basePath = unquote(baseEncodedPath)
-
-    body = {
-        "query": "query($listServerRelativeUrl:String!,$renderListDataAsStreamParameters:RenderListDataAsStreamParameters!,$renderListDataAsStreamQueryString:String!){legacy{renderListDataAsStream(listServerRelativeUrl:$listServerRelativeUrl,parameters:$renderListDataAsStreamParameters,queryString:$renderListDataAsStreamQueryString)}}",
-        "variables": {
-            "listServerRelativeUrl": f"{basePath}",
-            "renderListDataAsStreamParameters": {
-                "renderOptions": 5707527,
-                "allowMultipleValueFilterForTaxonomyFields": True,
-                "addRequiredFields": True,
-                "folderServerRelativeUrl": f"{fullPath}"
-            },
-            "renderListDataAsStreamQueryString": f"@a1='{baseEncodedPath}'&RootFolder={fullEncodedPath}"
-        }
-    }
     topBaseUrl = baseUrl.split("//", 1)[1].split("/", 1)[0]
-    graphqlUrl = f"https://{topBaseUrl}{unquote(fullEncodedPath.split(r'%2FDocuments%2F')[0])}/_api/v2.1/graphql"
     headers = {
         'Content-Type': 'application/json'
     }
     fileList = []
 
-    post_r = requests.post(graphqlUrl, data=json.dumps(body), headers=headers, cookies=cookies).json()
-    fileList += post_r["data"]["legacy"]["renderListDataAsStream"]["ListData"]["Row"]
-    newData = post_r["data"]["legacy"]["renderListDataAsStream"]["ListData"]
+    nextUrl = f"https://{topBaseUrl}{unquote(fullEncodedPath.split(r'%2FDocuments%2F')[0])}/_api/web/GetListUsingPath(DecodedUrl=@a1)/RenderListDataAsStream?@a1=%27{baseEncodedPath}%27&RootFolder={fullEncodedPath}&TryNewExperienceSingle=TRUE"
+    nextBody = {
+        "parameters": {
+            "RenderOptions": 5707527,
+            "AllowMultipleValueFilterForTaxonomyFields": True,
+            "AddRequiredFields": True
+        }
+    }
+    post_r = requests.post(nextUrl, data=json.dumps(nextBody), headers=headers, cookies=cookies).json()
+    LOGGER.info("Listing: " + post_r["rootFolder"].rsplit("/", 1)[1])
+    fileList += post_r["ListData"]["Row"]
+    newData = post_r["ListData"]
 
     while "NextHref" in newData.keys():
         href = newData["NextHref"][1:]
@@ -57,8 +50,8 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
         post_r = requests.post(nextUrl, data=json.dumps(nextBody), headers=headers, cookies=cookies).json()
         fileList += post_r["ListData"]["Row"]
         newData = post_r["ListData"]
-        sleep(1)
-    
+        sleep(0.5)
+
     dlLinks = []
     for eachFile in fileList:
 
@@ -71,10 +64,28 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
             dlUrl = baseUrl.split("onedrive.aspx?id=")[0] + "download.aspx?SourceUrl=" + eachFile["FileRef.urlencode"]
             dlLinks.append({
                 "fileName": eachFile["FileLeafRef"],
-                "filePath": unquote(folder).encode('ascii', errors='ignore').decode(),
+                "filePath": unquote(folder),
                 "url": dlUrl
             })
+    sleep(0.5)
     return dlLinks
+
+
+def getCookiesWithPassword(link, password):
+    r = requests.get(link)
+    soup = BeautifulSoup(r.text, "lxml")
+    viewstate = soup.find('input', {'id': '__VIEWSTATE'}).get('value')
+    eventvalidation = soup.find('input', {'id': '__EVENTVALIDATION'}).get('value')
+    linkParts = urlparse(link)
+    new_url = f"https://{linkParts.hostname}/personal/{linkParts.path.split('/personal/')[1].split('/')[0]}/_layouts/15/guestaccess.aspx?share={linkParts.path.rsplit('/', 1)[1]}"
+    body = {
+        "txtPassword": password,
+        "__EVENTVALIDATION": eventvalidation,
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEENCRYPTED": ""
+    }
+    r = requests.post(new_url, data=body)
+    return r, f"FedAuth={r.cookies.get_dict()['FedAuth']};"
 
 
 @run_async
@@ -88,7 +99,12 @@ def mirror_onedrive(update, context):
         link = ''
 
     try:
-        part = message_args[2]
+        password = message_args[2]
+    except IndexError:
+        password = ''
+
+    try:
+        part = message_args[3]
     except IndexError:
         part = ''
 
@@ -102,7 +118,10 @@ def mirror_onedrive(update, context):
     first_r = requests.head(link, allow_redirects=True)
 
     if "sharepoint.com" in link:
-        cookieString = f"FedAuth={first_r.cookies.get_dict()['FedAuth']};"
+        try:
+            cookieString = f"FedAuth={first_r.cookies.get_dict()['FedAuth']};"
+        except:
+            first_r, cookieString = getCookiesWithPassword(link, password)
 
         ariaOptions = {
             "header": f"Cookie:{cookieString}"
