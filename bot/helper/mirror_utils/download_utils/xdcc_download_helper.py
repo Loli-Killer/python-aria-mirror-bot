@@ -11,32 +11,11 @@ from time import sleep, time
 import irc.client
 
 from bot import LOGGER, download_dict, download_dict_lock
-from bot.helper.ext_utils.bot_utils import MirrorStatus
+from bot.helper.ext_utils.bot_utils import MirrorStatus, genpacks
 from bot.helper.mirror_utils.status_utils.xdcc_status import XDCCDownloadStatus
 
 
 irc.client.ServerConnection.buffer_class.encoding = "latin-1"
-
-def genpacks(packstr):
-    """It is a generator that returns it pack number describe by some string on
-    the format like '50-62,13,14,70-80'.
-
-    Args:
-        packstr(str): A string describing the range of packs
-    Yields:
-        int: The numeric pack of the next file to be downloaded.
-    """
-    l = packstr.split(",")
-    for p in l:
-        r = list(map(int, p.split("-")))
-        try:
-            s, e = r
-        except ValueError:
-            s = r[0]
-            e = r[0]
-        # raise error here
-        for k in range(s, e + 1):
-            yield k
 
 
 def random_nickname(word="lolikiller"):

@@ -1,4 +1,5 @@
 import re
+import os
 import json
 from time import sleep
 from urllib.parse import unquote, urlparse
@@ -14,7 +15,7 @@ from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMessage, update_all_messages
 
 
-def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
+def fetchChildren(fullEncodedPath, cookies, baseUrl, folder="", lastIndex = 0):
 
     baseEncodedPath = fullEncodedPath.split(r"%2FDocuments%2F")[0] + r"%2FDocuments"
     topBaseUrl = baseUrl.split("//", 1)[1].split("/", 1)[0]
@@ -47,7 +48,12 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
                 "AddRequiredFields": True
             }
         }
-        post_r = requests.post(nextUrl, data=json.dumps(nextBody), headers=headers, cookies=cookies).json()
+        while True:
+            try:
+                post_r = requests.post(nextUrl, data=json.dumps(nextBody), headers=headers, cookies=cookies).json()
+                break
+            except:
+                continue
         fileList += post_r["ListData"]["Row"]
         newData = post_r["ListData"]
         sleep(0.5)
@@ -67,6 +73,11 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder=""):
                 "filePath": unquote(folder),
                 "url": dlUrl
             })
+        
+        if lastIndex != 0:
+            if len(dlLinks) >= lastIndex:
+                return dlLinks
+
     sleep(0.5)
     return dlLinks
 
@@ -135,7 +146,16 @@ def mirror_onedrive(update, context):
         else:
             fullEncodedPath = re.search("^.*?id=(.*?)$", first_r.url).group(1)
             rootFolder = unquote(fullEncodedPath.rsplit("%2F", 1)[1])
-            childrenItems = fetchChildren(fullEncodedPath, first_r.cookies, first_r.url)
+            lastItemIndex = [item for item in bot_utils.genpacks(part)][-1] if part else 0
+            if os.path.isfile(os.path.join(os.getcwd(), f"temp\\{rootFolder}.json")):
+                with open(os.path.join(os.getcwd(), f"temp\\{rootFolder}.json")) as f:
+                    childrenItems = json.load(f)
+                if len(childrenItems) < lastItemIndex:
+                    childrenItems = fetchChildren(fullEncodedPath, first_r.cookies, first_r.url, lastIndex=lastItemIndex)
+            else:
+                childrenItems = fetchChildren(fullEncodedPath, first_r.cookies, first_r.url, lastIndex=lastItemIndex)
+            with open(os.path.join(os.getcwd(), f"temp\\{rootFolder}.json"), "w") as f:
+                json.dump(childrenItems, f, indent=4)
 
             listener = MirrorListener(bot, update, False, tag, False, rootFolder)
             basePath = f'{DOWNLOAD_DIR}/{listener.uid}/{rootFolder}'

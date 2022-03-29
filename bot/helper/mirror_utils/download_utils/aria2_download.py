@@ -4,32 +4,10 @@ from time import sleep, time
 from aria2p import API
 
 from bot import aria2, LOGGER, download_dict, download_dict_lock
-from bot.helper.ext_utils.bot_utils import new_thread, is_magnet, getDownloadByGid
+from bot.helper.ext_utils.bot_utils import new_thread, is_magnet, getDownloadByGid, genpacks
 from bot.helper.mirror_utils.download_utils.download_helper import DownloadHelper
 from bot.helper.mirror_utils.status_utils.aria_download_status import AriaDownloadStatus
 from bot.helper.telegram_helper.message_utils import update_all_messages
-
-
-def genpacks(packstr):
-    """It is a generator that returns it pack number describe by some string on
-    the format like '50-62,13,14,70-80'.
-
-    Args:
-        packstr(str): A string describing the range of packs
-    Yields:
-        int: The numeric pack of the next file to be downloaded.
-    """
-    l = packstr.split(",")
-    for p in l:
-        r = list(map(int, p.split("-")))
-        try:
-            s, e = r
-        except ValueError:
-            s = r[0]
-            e = r[0]
-        # raise error here
-        for k in range(s, e + 1):
-            yield k
 
 
 class AriaQueue:
@@ -41,6 +19,7 @@ class AriaQueue:
         self.queue = (link for link in links)
         self.queue_length = len(links)
         self.current_download = 0
+        self.download_index = 0
 
         self.base_path = base_path
         self.aria_options = aria_options
@@ -145,6 +124,7 @@ class AriaDownloadHelper(DownloadHelper):
         queue = self.queue_dict[uid]
         entry = next(queue.queue)
         queue.current_download += 1
+        queue.download_index += 1
         aria_options = queue.aria_options
 
         try:
@@ -153,9 +133,9 @@ class AriaDownloadHelper(DownloadHelper):
             threading.Thread(target=queue.listener.onDownloadComplete).start()
             return
         
-        while nextPart < queue.current_download:
+        while nextPart > queue.download_index:
             entry = next(queue.queue)
-            queue.current_download += 1
+            queue.download_index += 1
 
         if queue.delayTime:
             currentTime = time()

@@ -156,3 +156,24 @@ def new_thread(fn):
         return thread
 
     return wrapper
+
+def genpacks(packstr):
+    """It is a generator that returns it pack number describe by some string on
+    the format like '50-62,13,14,70-80'.
+
+    Args:
+        packstr(str): A string describing the range of packs
+    Yields:
+        int: The numeric pack of the next file to be downloaded.
+    """
+    l = packstr.split(",")
+    for p in l:
+        r = list(map(int, p.split("-")))
+        try:
+            s, e = r
+        except ValueError:
+            s = r[0]
+            e = r[0]
+        # raise error here
+        for k in range(s, e + 1):
+            yield k
