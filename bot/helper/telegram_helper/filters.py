@@ -1,29 +1,30 @@
-from telegram.ext import BaseFilter
 from telegram import Message
+from telegram.ext import MessageFilter
+
 from bot import AUTHORIZED_CHATS, OWNER_ID, download_dict, download_dict_lock
 
 
 class CustomFilters:
-    class _OwnerFilter(BaseFilter):
-        def filter(self, message):
+    class _OwnerFilter(MessageFilter):
+        def filter(self, message: Message):
             return bool(message.from_user.id == OWNER_ID)
 
     owner_filter = _OwnerFilter()
 
-    class _AuthorizedUserFilter(BaseFilter):
-        def filter(self, message):
+    class _AuthorizedUserFilter(MessageFilter):
+        def filter(self, message: Message):
             id = message.from_user.id
             return bool(id in AUTHORIZED_CHATS or id == OWNER_ID)
 
     authorized_user = _AuthorizedUserFilter()
 
-    class _AuthorizedChat(BaseFilter):
-        def filter(self, message):
+    class _AuthorizedChat(MessageFilter):
+        def filter(self, message: Message):
             return bool(message.chat.id in AUTHORIZED_CHATS)
 
     authorized_chat = _AuthorizedChat()
 
-    class _MirrorOwner(BaseFilter):
+    class _MirrorOwner(MessageFilter):
         def filter(self, message: Message):
             user_id = message.from_user.id
             if user_id == OWNER_ID:

@@ -7,8 +7,9 @@ from os import execl, path, remove, getcwd
 from sys import executable
 
 import psutil
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
-from telegram.ext import CommandHandler, run_async
 import bot
 from bot import dispatcher, updater, botStartTime, LOGGER
 from bot.helper.ext_utils import fs_utils
@@ -20,16 +21,14 @@ from bot.modules import authorize, list, cancel_mirror, mirror_status, mirror, c
 from bot.custom_mirrors import fembed, xdcc_mirror, cloudflare_mirror, onedrive_mirror
 
 
-@run_async
-def change_root(update, context):
+def change_root(update: Update, context: CallbackContext):
     message_args = update.message.text.split(' ')
-    bot.parent_id = message_args[1]
-    message = f'Changed root drive ID to {bot.parent_id}'
+    bot.PARENT_ID = message_args[1]
+    message = f'Changed root drive ID to {bot.PARENT_ID}'
     sendMessage(message, context.bot, update)
 
 
-@run_async
-def stats(update, context):
+def stats(update: Update, context: CallbackContext):
     currentTime = get_readable_time((time.time() - botStartTime))
     total, used, free = shutil.disk_usage('.')
     total = get_readable_file_size(total)
@@ -46,8 +45,7 @@ def stats(update, context):
     sendMessage(stats, context.bot, update)
 
 
-@run_async
-def start(update, context):
+def start(update: Update, context: CallbackContext):
     start_string = f'''
 This is a bot which can mirror all your links to Google drive!
 Type /{BotCommands.HelpCommand} to get a list of available commands
@@ -55,8 +53,7 @@ Type /{BotCommands.HelpCommand} to get a list of available commands
     sendMessage(start_string, context.bot, update)
 
 
-@run_async
-def restart(update, context):
+def restart(update: Update, context: CallbackContext):
     restart_message = sendMessage("Restarting, Please wait!", context.bot, update)
     # Save restart message object in order to reply to it after restarting
     try:
@@ -64,26 +61,26 @@ def restart(update, context):
     except:
         pass
     with open('restart.pickle', 'wb') as status:
-        pickle.dump(restart_message, status)
+        pickle.dump({
+            "message_id": restart_message.message_id,
+            "chat_id": restart_message.chat.id
+        }, status)
     subprocess.call(path.join(getcwd(), "update.sh"), stdout=subprocess.PIPE, shell=True)
     execl(executable, executable, "-m", "bot")
 
 
-@run_async
-def ping(update, context):
+def ping(update: Update, context: CallbackContext):
     start_time = int(round(time.time() * 1000))
     reply = sendMessage("Starting Ping", context.bot, update)
     end_time = int(round(time.time() * 1000))
     editMessage(f'{end_time - start_time} ms', reply)
 
 
-@run_async
-def log(update, context):
+def log(update: Update, context: CallbackContext):
     sendLogFile(context.bot, update)
 
 
-@run_async
-def bot_help(update, context):
+def bot_help(update: Update, context: CallbackContext):
     help_string = f'''
 /{BotCommands.HelpCommand}: To get this message
 
@@ -119,21 +116,45 @@ def main():
     if path.exists('restart.pickle'):
         with open('restart.pickle', 'rb') as status:
             restart_message = pickle.load(status)
-        restart_message.edit_text("Restarted Successfully!")
+        editMessage("Restarted Successfully!", None, restart_message)
         remove('restart.pickle')
 
-    start_handler = CommandHandler(BotCommands.StartCommand, start,
-                                   filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-    ping_handler = CommandHandler(BotCommands.PingCommand, ping,
-                                  filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-    restart_handler = CommandHandler(BotCommands.RestartCommand, restart,
-                                     filters=CustomFilters.owner_filter)
-    help_handler = CommandHandler(BotCommands.HelpCommand,
-                                  bot_help, filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-    stats_handler = CommandHandler(BotCommands.StatsCommand,
-                                   stats, filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-    log_handler = CommandHandler(BotCommands.LogCommand, log, filters=CustomFilters.owner_filter)
-    change_handler = CommandHandler("changeroot", change_root, filters=CustomFilters.owner_filter)
+    start_handler = CommandHandler(
+        BotCommands.StartCommand, start,
+        filters=CustomFilters.authorized_chat | CustomFilters.authorized_user,
+        run_async=True
+    )
+    ping_handler = CommandHandler(
+        BotCommands.PingCommand, ping,
+        filters=CustomFilters.authorized_chat | CustomFilters.authorized_user,
+        run_async=True
+    )
+    restart_handler = CommandHandler(
+        BotCommands.RestartCommand, restart,
+        filters=CustomFilters.owner_filter,
+        run_async=True
+    )
+    help_handler = CommandHandler(
+        BotCommands.HelpCommand, bot_help,
+        filters=CustomFilters.authorized_chat | CustomFilters.authorized_user,
+        run_async=True
+    )
+    stats_handler = CommandHandler(
+        BotCommands.StatsCommand, stats,
+        filters=CustomFilters.authorized_chat | CustomFilters.authorized_user,
+        run_async=True
+    )
+    log_handler = CommandHandler(
+        BotCommands.LogCommand, log,
+        filters=CustomFilters.owner_filter,
+        run_async=True
+    )
+    change_handler = CommandHandler(
+        BotCommands.ChangeRootCommand, change_root,
+        filters=CustomFilters.owner_filter,
+        run_async=True
+    )
+
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(ping_handler)
     dispatcher.add_handler(restart_handler)
@@ -141,6 +162,7 @@ def main():
     dispatcher.add_handler(stats_handler)
     dispatcher.add_handler(log_handler)
     dispatcher.add_handler(change_handler)
+
     updater.start_polling()
     LOGGER.info("Bot Started!")
     signal.signal(signal.SIGINT, fs_utils.exit_clean_up)

@@ -1,6 +1,7 @@
 import threading
 
-from telegram.ext import CommandHandler, run_async
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
 from bot import bot, dispatcher, status_reply_dict, status_reply_dict_lock
 from bot.helper.ext_utils.bot_utils import get_readable_message
@@ -10,8 +11,7 @@ from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMess
     deleteMessage, auto_delete_message
 
 
-@run_async
-def mirror_status(update,context):
+def mirror_status(update: Update, context: CallbackContext):
     message = get_readable_message()
     if len(message) == 0:
         message = "No active downloads"
@@ -23,10 +23,13 @@ def mirror_status(update,context):
         if index in status_reply_dict.keys():
             deleteMessage(bot, status_reply_dict[index])
             del status_reply_dict[index]
-    sendStatusMessage(update,context.bot)
-    deleteMessage(context.bot,update.message)
+    sendStatusMessage(update, context.bot)
+    deleteMessage(context.bot, update.message)
 
 
-mirror_status_handler = CommandHandler(BotCommands.StatusCommand, mirror_status,
-                                       filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
+mirror_status_handler = CommandHandler(
+    BotCommands.StatusCommand, mirror_status,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
 dispatcher.add_handler(mirror_status_handler)

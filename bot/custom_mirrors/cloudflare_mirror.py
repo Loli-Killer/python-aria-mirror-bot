@@ -1,16 +1,18 @@
 from urllib.parse import urlparse
 
 import requests
-from telegram.ext import CommandHandler, run_async
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
-from bot import Interval, LOGGER, dispatcher, DOWNLOAD_DIR, DOWNLOAD_STATUS_UPDATE_INTERVAL
+from bot import Interval, dispatcher, LOGGER, DOWNLOAD_DIR, DOWNLOAD_STATUS_UPDATE_INTERVAL
 from bot.modules.mirror import ariaDlManager, MirrorListener
 from bot.helper.ext_utils import bot_utils
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMessage, update_all_messages
+from bot.custom_mirrors.custom_mirror_commands import CustomBotCommands
 
-@run_async
-def mirrorcf(update, context):
+
+def mirrorcf(update: Update, context: CallbackContext):
 
     bot = context.bot
     message_args = update.message.text.split(' ')
@@ -52,6 +54,9 @@ def mirrorcf(update, context):
         Interval.append(bot_utils.setInterval(DOWNLOAD_STATUS_UPDATE_INTERVAL, update_all_messages))
 
 
-cf_handler = CommandHandler("cf", mirrorcf,
-                                filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
+cf_handler = CommandHandler(
+    CustomBotCommands.CloudflareCommand, mirrorcf,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
 dispatcher.add_handler(cf_handler)

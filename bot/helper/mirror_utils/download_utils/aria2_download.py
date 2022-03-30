@@ -4,10 +4,10 @@ from time import sleep, time
 from aria2p import API
 
 from bot import aria2, LOGGER, download_dict, download_dict_lock
-from bot.helper.ext_utils.bot_utils import new_thread, is_magnet, getDownloadByGid, genpacks
+from bot.helper.ext_utils.bot_utils import new_thread, is_magnet, get_download_by_gid, genpacks
 from bot.helper.mirror_utils.download_utils.download_helper import DownloadHelper
 from bot.helper.mirror_utils.status_utils.aria_download_status import AriaDownloadStatus
-from bot.helper.telegram_helper.message_utils import update_all_messages
+from bot.helper.telegram_helper.message_utils import update_all_messages, sendMessage
 
 
 class AriaQueue:
@@ -20,6 +20,7 @@ class AriaQueue:
         self.queue_length = len(links)
         self.current_download = 0
         self.download_index = 0
+        self.failed_downloads = 0
 
         self.base_path = base_path
         self.aria_options = aria_options
@@ -50,7 +51,7 @@ class AriaDownloadHelper(DownloadHelper):
     @new_thread
     def __onDownloadStarted(self, api, gid):
         LOGGER.info(f"onDownloadStart: {gid}")
-        dl = getDownloadByGid(gid)
+        dl = get_download_by_gid(gid)
         if dl:
             self.queue_dict[dl.uid()].name = api.get_download(gid).name
         update_all_messages()
@@ -58,7 +59,7 @@ class AriaDownloadHelper(DownloadHelper):
 
     def __onDownloadComplete(self, api: API, gid):
         LOGGER.info(f"onDownloadComplete: {gid}")
-        dl = getDownloadByGid(gid)
+        dl = get_download_by_gid(gid)
         download = api.get_download(gid)
         if download.followed_by_ids:
             new_gid = download.followed_by_ids[0]
@@ -75,13 +76,17 @@ class AriaDownloadHelper(DownloadHelper):
             if queue.current_download != queue.queue_length:
                 self.__startNextDownload(dl.uid())
                 return
+            if queue.failed_downloads > 0:
+                tgObj = dl.getListener()
+                msg = f"Total Failed Tasks: {queue.failed_downloads}"
+                sendMessage(msg, tgObj.bot, tgObj.update)
             threading.Thread(target=dl.getListener().onDownloadComplete).start()
 
 
     @new_thread
     def __onDownloadPause(self, api, gid):
         LOGGER.info(f"onDownloadPause: {gid}")
-        dl = getDownloadByGid(gid)
+        dl = get_download_by_gid(gid)
         try:
             dl.getListener().onDownloadError('Download stopped by user!')
         except AttributeError:
@@ -91,7 +96,7 @@ class AriaDownloadHelper(DownloadHelper):
     @new_thread
     def __onDownloadStopped(self, api, gid):
         LOGGER.info(f"onDownloadStop: {gid}")
-        dl = getDownloadByGid(gid)
+        dl = get_download_by_gid(gid)
         if dl:
             dl.getListener().onDownloadError('Download stopped by user!')
 
@@ -100,11 +105,19 @@ class AriaDownloadHelper(DownloadHelper):
     def __onDownloadError(self, api, gid):
         sleep(0.5) #sleep for split second to ensure proper dl gid update from onDownloadComplete
         LOGGER.info(f"onDownloadError: {gid}")
-        dl = getDownloadByGid(gid)
+        dl = get_download_by_gid(gid)
         download = api.get_download(gid)
         error = download.error_message
         LOGGER.info(f"Download Error: {error}")
         if dl:
+            queue = self.queue_dict[dl.uid()]
+            if queue.current_download != queue.queue_length:
+                queue.failed_downloads += 1
+                if queue.failed_downloads < 10:
+                    self.__startNextDownload(dl.uid())
+                    return
+                else:
+                    dl.getListener().onDownloadError("Failed coz too many errors")
             dl.getListener().onDownloadError(error)
 
 

@@ -1,7 +1,8 @@
-import logging
 import re
-import threading
 import time
+import logging
+import threading
+
 from html import escape
 
 from bot import download_dict, download_dict_lock
@@ -48,7 +49,7 @@ class setInterval:
         self.stopEvent.set()
 
 
-def get_readable_file_size(size_in_bytes) -> str:
+def get_readable_file_size(size_in_bytes: int) -> str:
     if size_in_bytes is None:
         return '0B'
     index = 0
@@ -61,7 +62,7 @@ def get_readable_file_size(size_in_bytes) -> str:
         return 'File too large'
 
 
-def getDownloadByGid(gid):
+def get_download_by_gid(gid: str):
     with download_dict_lock:
         for dl in download_dict.values():
             status = dl.status()
@@ -157,7 +158,7 @@ def new_thread(fn):
 
     return wrapper
 
-def genpacks(packstr):
+def genpacks(packstr: str):
     """It is a generator that returns it pack number describe by some string on
     the format like '50-62,13,14,70-80'.
 

@@ -193,7 +193,7 @@ class GoogleDriveHelper:
         if os.path.isfile(file_path):
             try:
                 mime_type = get_mime_type(file_path)
-                link = self.upload_file(file_path, file_name, mime_type, bot.parent_id)
+                link = self.upload_file(file_path, file_name, mime_type, bot.PARENT_ID)
                 if link is None:
                     raise Exception('Upload has been manually cancelled')
                 LOGGER.info("Uploaded To G-Drive: " + file_path)
@@ -210,7 +210,7 @@ class GoogleDriveHelper:
                 self.updater.cancel()
         else:
             try:
-                dir_id = self.create_directory(os.path.basename(os.path.abspath(file_name)), bot.parent_id)
+                dir_id = self.create_directory(os.path.basename(os.path.abspath(file_name)), bot.PARENT_ID)
                 result = self.upload_dir(file_path, dir_id)
                 if result is None:
                     raise Exception('Upload has been manually cancelled!')
@@ -292,7 +292,7 @@ class GoogleDriveHelper:
         try:
             meta = self.getFileMetadata(file_id)
             if meta.get("mimeType") == self.__G_DRIVE_DIR_MIME_TYPE:
-                dir_id = self.create_directory(meta.get('name'), bot.parent_id)
+                dir_id = self.create_directory(meta.get('name'), bot.PARENT_ID)
                 result = self.cloneFolder(meta.get('name'), meta.get('name'), meta.get('id'), dir_id)
                 msg += f'<a href="{self.__G_DRIVE_DIR_BASE_DOWNLOAD_URL.format(dir_id)}">{meta.get("name")}</a>' \
                         f' ({get_readable_file_size(self.transferred_size)})'
@@ -300,7 +300,7 @@ class GoogleDriveHelper:
                     url = requests.utils.requote_uri(f'{INDEX_URL}/{meta.get("name")}/')
                     msg += f' | <a href="{url}"> Index URL</a>'
             else:
-                file = self.copyFile(meta.get('id'), bot.parent_id)
+                file = self.copyFile(meta.get('id'), bot.PARENT_ID)
                 msg += f'<a href="{self.__G_DRIVE_BASE_DOWNLOAD_URL.format(file.get("id"))}">{file.get("name")}</a>'
                 try:
                     msg += f' ({get_readable_file_size(int(meta.get("size")))}) '
@@ -418,7 +418,7 @@ class GoogleDriveHelper:
         msg = ""
         fileName = self.escapes(str(fileName))
         # Create Search Query for API request.
-        query = f"'{bot.parent_id}' in parents and (name contains '{fileName}')"
+        query = f"'{bot.PARENT_ID}' in parents and (name contains '{fileName}')"
         response = self.__service.files().list(supportsTeamDrives=True,
                                                includeTeamDriveItems=True,
                                                q=query,

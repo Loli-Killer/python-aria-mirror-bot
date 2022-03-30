@@ -6,13 +6,15 @@ from urllib.parse import unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
-from telegram.ext import CommandHandler, run_async
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
 from bot import Interval, LOGGER, dispatcher, DOWNLOAD_DIR, DOWNLOAD_STATUS_UPDATE_INTERVAL
 from bot.modules.mirror import ariaDlManager, MirrorListener
 from bot.helper.ext_utils import bot_utils
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMessage, update_all_messages
+from bot.custom_mirrors.custom_mirror_commands import CustomBotCommands
 
 
 def fetchChildren(fullEncodedPath, cookies, baseUrl, folder="", lastIndex = 0):
@@ -82,7 +84,7 @@ def fetchChildren(fullEncodedPath, cookies, baseUrl, folder="", lastIndex = 0):
     return dlLinks
 
 
-def getCookiesWithPassword(link, password):
+def getCookiesWithPassword(link: str, password: str):
     r = requests.get(link)
     soup = BeautifulSoup(r.text, "lxml")
     viewstate = soup.find('input', {'id': '__VIEWSTATE'}).get('value')
@@ -99,8 +101,7 @@ def getCookiesWithPassword(link, password):
     return r, f"FedAuth={r.cookies.get_dict()['FedAuth']};"
 
 
-@run_async
-def mirror_onedrive(update, context):
+def mirror_onedrive(update: Update, context: CallbackContext):
 
     bot = context.bot
     message_args = update.message.text.split(' ')
@@ -177,6 +178,9 @@ def mirror_onedrive(update, context):
         Interval.append(bot_utils.setInterval(DOWNLOAD_STATUS_UPDATE_INTERVAL, update_all_messages))
 
 
-onedrive_handler = CommandHandler("onedrive", mirror_onedrive,
-                                filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
+onedrive_handler = CommandHandler(
+    CustomBotCommands.OnedriveCommand, mirror_onedrive,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
 dispatcher.add_handler(onedrive_handler)

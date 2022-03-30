@@ -1,4 +1,5 @@
-from telegram.ext import run_async, CommandHandler, Filters
+from telegram import Update
+from telegram.ext import CommandHandler, Filters, CallbackContext
 
 from bot import AUTHORIZED_CHATS, dispatcher
 from bot.helper.telegram_helper.filters import CustomFilters
@@ -6,8 +7,7 @@ from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.message_utils import sendMessage
 
 
-@run_async
-def authorize(update, context):
+def authorize(update: Update, context: CallbackContext):
     reply_message = update.message.reply_to_message
     msg = ''
     with open('authorized_chats.txt', 'a') as file:
@@ -32,8 +32,7 @@ def authorize(update, context):
         sendMessage(msg, context.bot, update)
 
 
-@run_async
-def unauthorize(update, context):
+def unauthorize(update: Update, context: CallbackContext):
     reply_message = update.message.reply_to_message
     if reply_message is None:
         # Trying to unauthorize a chat
@@ -58,9 +57,15 @@ def unauthorize(update, context):
     sendMessage(msg, context.bot, update)
 
 
-authorize_handler = CommandHandler(command=BotCommands.AuthorizeCommand, callback=authorize,
-                                   filters=CustomFilters.owner_filter & Filters.group)
-unauthorize_handler = CommandHandler(command=BotCommands.UnAuthorizeCommand, callback=unauthorize,
-                                     filters=CustomFilters.owner_filter & Filters.group)
+authorize_handler = CommandHandler(
+    BotCommands.AuthorizeCommand, authorize,
+    CustomFilters.owner_filter & Filters.chat_type.groups,
+    run_async=True
+)
+unauthorize_handler = CommandHandler(
+    BotCommands.UnAuthorizeCommand, unauthorize,
+    CustomFilters.owner_filter & Filters.chat_type.groups,
+    run_async=True
+)
 dispatcher.add_handler(authorize_handler)
 dispatcher.add_handler(unauthorize_handler)

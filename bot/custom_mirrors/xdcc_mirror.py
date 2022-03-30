@@ -1,18 +1,19 @@
 import re
 import binascii
 
-from telegram.ext import CommandHandler, run_async
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
 from bot import Interval, dispatcher, DOWNLOAD_DIR, DOWNLOAD_STATUS_UPDATE_INTERVAL
 from bot.modules.mirror import MirrorListener
-from bot.helper.ext_utils.bot_utils import getDownloadByGid, setInterval
+from bot.helper.ext_utils.bot_utils import get_download_by_gid, setInterval
 from bot.helper.mirror_utils.download_utils.xdcc_download_helper import XDCCDownload
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMessage, update_all_messages
+from bot.custom_mirrors.custom_mirror_commands import CustomBotCommands
 
 
-@run_async
-def xdcc_download(update, context):
+def xdcc_download(update: Update, context: CallbackContext):
 
     bot = context.bot
     message_args = update.message.text.split(' ', 2)
@@ -64,7 +65,7 @@ def xdcc_download(update, context):
     })
 
     gid = format(binascii.crc32((args['bot'] + args['packs']).encode('utf8')), '08x')
-    if getDownloadByGid(gid):
+    if get_download_by_gid(gid):
         sendMessage('Mirror already in queue.', bot, update)
         return
 
@@ -77,6 +78,9 @@ def xdcc_download(update, context):
         Interval.append(setInterval(DOWNLOAD_STATUS_UPDATE_INTERVAL, update_all_messages))
 
 
-xdcc_handler = CommandHandler("xdcc", xdcc_download,
-                                filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
+xdcc_handler = CommandHandler(
+    CustomBotCommands.XdccCommand, xdcc_download,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
 dispatcher.add_handler(xdcc_handler)

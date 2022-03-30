@@ -1,22 +1,22 @@
 from time import sleep
 
-from telegram.ext import CommandHandler, run_async
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
 
 from bot import download_dict, dispatcher, download_dict_lock, DOWNLOAD_DIR
-from bot.helper.ext_utils.bot_utils import getDownloadByGid, MirrorStatus
+from bot.helper.ext_utils.bot_utils import get_download_by_gid, MirrorStatus
 from bot.helper.ext_utils.fs_utils import clean_download
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.message_utils import sendMessage, delete_all_messages
 
 
-@run_async
-def cancel_mirror(update, context):
+def cancel_mirror(update: Update, context: CallbackContext):
     args = update.message.text.split(" ", maxsplit=1)
     mirror_message = None
     if len(args) > 1:
         gid = args[1]
-        dl = getDownloadByGid(gid)
+        dl = get_download_by_gid(gid)
         if not dl:
             sendMessage(f"GID: <code>{gid}</code> not found.", context.bot, update)
             return
@@ -51,8 +51,7 @@ def cancel_mirror(update, context):
     clean_download(f'{DOWNLOAD_DIR}{mirror_message.message_id}/')
 
 
-@run_async
-def cancel_all(update, context):
+def cancel_all(update: Update, context: CallbackContext):
     with download_dict_lock:
         count = 0
         for dlDetails in list(download_dict.values()):
@@ -65,9 +64,15 @@ def cancel_all(update, context):
     sendMessage(f'Cancelled {count} downloads!', context.bot, update)
 
 
-cancel_mirror_handler = CommandHandler(BotCommands.CancelMirror, cancel_mirror,
-                                       filters=(CustomFilters.authorized_chat | CustomFilters.authorized_user) & CustomFilters.mirror_owner_filter)
-cancel_all_handler = CommandHandler(BotCommands.CancelAllCommand, cancel_all,
-                                    filters=CustomFilters.owner_filter)
+cancel_mirror_handler = CommandHandler(
+    BotCommands.CancelMirror, cancel_mirror,
+    (CustomFilters.authorized_chat | CustomFilters.authorized_user) & CustomFilters.mirror_owner_filter,
+    run_async=True
+)
+cancel_all_handler = CommandHandler(
+    BotCommands.CancelAllCommand, cancel_all,
+    CustomFilters.owner_filter,
+    run_async=True
+)
 dispatcher.add_handler(cancel_all_handler)
 dispatcher.add_handler(cancel_mirror_handler)

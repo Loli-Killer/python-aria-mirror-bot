@@ -4,12 +4,13 @@ import subprocess
 import threading
 
 import requests
-from telegram.ext import CommandHandler, run_async
+from telegram import Update, Bot
+from telegram.ext import CommandHandler, CallbackContext
 
 from bot import Interval, INDEX_URL, LOGGER, MEGA_KEY
 from bot import dispatcher, DOWNLOAD_DIR, DOWNLOAD_STATUS_UPDATE_INTERVAL, download_dict, download_dict_lock
-from bot.helper.ext_utils import fs_utils, bot_utils
-from bot.helper.ext_utils.bot_utils import setInterval
+from bot.helper.ext_utils import fs_utils
+from bot.helper.ext_utils.bot_utils import setInterval, is_url, is_magnet, is_mega_link
 from bot.helper.ext_utils.exceptions import DirectDownloadLinkException, NotSupportedExtractionArchive
 from bot.helper.mirror_utils.download_utils.aria2_download import AriaDownloadHelper
 from bot.helper.mirror_utils.download_utils.mega_download import MegaDownloader
@@ -30,7 +31,13 @@ ariaDlManager.start_listener()
 
 
 class MirrorListener(listeners.MirrorListeners):
-    def __init__(self, bot, update, isTar=False, tag=None, extract=False, root=""):
+    def __init__(
+        self, bot: Bot, update: Update,
+        isTar: bool = False,
+        tag:str = None,
+        extract: bool = False,
+        root: str = ""
+    ):
         super().__init__(bot, update)
         self.isTar = isTar
         self.tag = tag
@@ -113,7 +120,7 @@ class MirrorListener(listeners.MirrorListeners):
         update_all_messages()
         drive.upload(up_name)
 
-    def onDownloadError(self, error):
+    def onDownloadError(self, error: str):
         error = error.replace('<', ' ')
         error = error.replace('>', ' ')
         LOGGER.info(self.update.effective_chat.id)
@@ -184,7 +191,7 @@ class MirrorListener(listeners.MirrorListeners):
             update_all_messages()
 
 
-def _mirror(bot, update, isTar=False, extract=False):
+def _mirror(bot: Bot, update: Update, isTar: bool = False, extract: bool = False):
     message_args = update.message.text.split(' ', 3)
     try:
         link = message_args[1]
@@ -234,7 +241,7 @@ def _mirror(bot, update, isTar=False, extract=False):
                     link = file.get_file().file_path
     else:
         tag = None
-    if not bot_utils.is_url(link) and not bot_utils.is_magnet(link):
+    if not is_url(link) and not is_magnet(link):
         sendMessage('No download source provided', bot, update)
         return
 
@@ -245,7 +252,7 @@ def _mirror(bot, update, isTar=False, extract=False):
     except DirectDownloadLinkException as e:
         LOGGER.info(f'{link}: {e}')
     listener = MirrorListener(bot, update, isTar, tag, extract)
-    if bot_utils.is_mega_link(link) and MEGA_KEY is not None:
+    if is_mega_link(link) and MEGA_KEY is not None:
         mega_dl = MegaDownloader(listener)
         mega_dl.add_download(link, f'{DOWNLOAD_DIR}{listener.uid}/')
     else:
@@ -255,12 +262,13 @@ def _mirror(bot, update, isTar=False, extract=False):
         Interval.append(setInterval(DOWNLOAD_STATUS_UPDATE_INTERVAL, update_all_messages))
 
 
-def _mirror_many(bot, update):
+def _mirror_many(bot: Bot, update: Update):
     message_args = update.message.text.split(' ', 2)
 
     if len(message_args) != 3:
-        sendMessage('Usage is : `/mirror_many <single|batch> <link1,link2,link3>`', bot, update, "md")
+        sendMessage('Usage is : `/mirrormany <single|batch> <link1,link2,link3>`', bot, update, "md")
         return
+
     mode = message_args[1].strip()
     link = message_args[2].strip()
     LOGGER.info(link)
@@ -270,7 +278,7 @@ def _mirror_many(bot, update):
     invalid_links = []
     valid_links = []
     for each_link in links:
-        if not bot_utils.is_url(each_link) and not bot_utils.is_magnet(each_link):
+        if not is_url(each_link) and not is_magnet(each_link):
             invalid_links.append(each_link)
         else:
             valid_links.append(each_link)
@@ -282,6 +290,7 @@ def _mirror_many(bot, update):
             listener = MirrorListener(bot, update, False, tag, False)
             listener.uid = f"{listener.uid}{num}"
             ariaDlManager.add_download(f'{DOWNLOAD_DIR}/{listener.uid}/', [each_link], listener, {})
+            LOGGER.info(listener.uid)
             num += 1
 
     elif mode == "batch":
@@ -300,34 +309,44 @@ def _mirror_many(bot, update):
         Interval.append(setInterval(DOWNLOAD_STATUS_UPDATE_INTERVAL, update_all_messages))
 
 
-@run_async
-def mirror(update, context):
+def mirror(update: Update, context: CallbackContext):
     _mirror(context.bot, update)
 
 
-@run_async
-def mirror_many(update, context):
-    _mirror_many(context.bot, update)
-
-
-@run_async
-def tar_mirror(update, context):
+def tar_mirror(update: Update, context: CallbackContext):
     _mirror(context.bot, update, True)
 
 
-@run_async
-def unzip_mirror(update, context):
+def unzip_mirror(update: Update, context: CallbackContext):
     _mirror(context.bot, update, extract=True)
 
 
-mirror_handler = CommandHandler(BotCommands.MirrorCommand, mirror,
-                                filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-mirror_many_handler = CommandHandler(BotCommands.MirrorManyCommand, mirror_many,
-                                filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-tar_mirror_handler = CommandHandler(BotCommands.TarMirrorCommand, tar_mirror,
-                                    filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
-unzip_mirror_handler = CommandHandler(BotCommands.UnzipMirrorCommand, unzip_mirror,
-                                      filters=CustomFilters.authorized_chat | CustomFilters.authorized_user)
+def mirror_many(update: Update, context: CallbackContext):
+    _mirror_many(context.bot, update)
+
+
+
+mirror_handler = CommandHandler(
+    BotCommands.MirrorCommand, mirror,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
+mirror_many_handler = CommandHandler(
+    BotCommands.MirrorManyCommand, mirror_many,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
+tar_mirror_handler = CommandHandler(
+    BotCommands.TarMirrorCommand, tar_mirror,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
+unzip_mirror_handler = CommandHandler(
+    BotCommands.UnzipMirrorCommand, unzip_mirror,
+    CustomFilters.authorized_chat | CustomFilters.authorized_user,
+    run_async=True
+)
+
 dispatcher.add_handler(mirror_handler)
 dispatcher.add_handler(mirror_many_handler)
 dispatcher.add_handler(tar_mirror_handler)

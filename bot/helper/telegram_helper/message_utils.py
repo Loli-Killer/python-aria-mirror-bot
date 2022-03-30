@@ -1,51 +1,68 @@
 import time
 
-from telegram import Message, Update
+from telegram import Message, Update, Bot
 
 from bot import AUTO_DELETE_MESSAGE_DURATION, LOGGER, bot, \
     status_reply_dict, status_reply_dict_lock
 from bot.helper.ext_utils.bot_utils import get_readable_message
 
 
-def sendMessage(text: str, bot, update: Update, mode="HTML"):
+def sendMessage(text: str, bot: Bot, update: Update, mode: str = "HTML"):
     try:
         if mode == "HTML":
-            return bot.send_message(update.message.chat_id,
-                                reply_to_message_id=update.message.message_id,
-                                text=text, parse_mode='HTML')
+            return bot.send_message(
+                update.message.chat_id,
+                reply_to_message_id=update.message.message_id,
+                text=text, parse_mode='HTML'
+            )
         elif mode == "md":
-            return bot.send_message(update.message.chat_id,
-                                reply_to_message_id=update.message.message_id,
-                                text=text, parse_mode='Markdown')
+            return bot.send_message(
+                update.message.chat_id,
+                reply_to_message_id=update.message.message_id,
+                text=text, parse_mode='Markdown'
+            )
     except Exception as e:
         LOGGER.error(str(e))
 
 
-def editMessage(text: str, message: Message):
+def editMessage(text: str, message: Message, message_group: dict = None):
     try:
-        bot.edit_message_text(text=text, message_id=message.message_id,
-                              chat_id=message.chat.id,
-                              parse_mode='HTML')
+        if message_group:
+            bot.edit_message_text(
+                text=text, message_id=message_group["message_id"],
+                chat_id=message_group["chat_id"],
+                parse_mode='HTML'
+            )
+        else:
+            bot.edit_message_text(
+                text=text, message_id=message.message_id,
+                chat_id=message.chat.id,
+                parse_mode='HTML'
+            )
     except Exception as e:
         LOGGER.error(str(e))
 
 
-def deleteMessage(bot, message: Message):
+def deleteMessage(bot: Bot, message: Message):
     try:
-        bot.delete_message(chat_id=message.chat.id,
-                           message_id=message.message_id)
+        bot.delete_message(
+            chat_id=message.chat.id,
+            message_id=message.message_id
+        )
     except Exception as e:
         LOGGER.error(str(e))
 
 
-def sendLogFile(bot, update: Update):
+def sendLogFile(bot: Bot, update: Update):
     with open('log.txt', 'rb') as f:
-        bot.send_document(document=f, filename=f.name,
-                          reply_to_message_id=update.message.message_id,
-                          chat_id=update.message.chat_id)
+        bot.send_document(
+            document=f, filename=f.name,
+            reply_to_message_id=update.message.message_id,
+            chat_id=update.message.chat_id
+        )
 
 
-def auto_delete_message(bot, cmd_message: Message, bot_message: Message):
+def auto_delete_message(bot: Bot, cmd_message: Message, bot_message: Message):
     if AUTO_DELETE_MESSAGE_DURATION != -1:
         time.sleep(AUTO_DELETE_MESSAGE_DURATION)
         try:
@@ -79,7 +96,7 @@ def update_all_messages():
                 status_reply_dict[chat_id].text = msg
 
 
-def sendStatusMessage(msg, bot):
+def sendStatusMessage(msg: Message, bot: Bot):
     progress = get_readable_message()
     with status_reply_dict_lock:
         if msg.message.chat.id in list(status_reply_dict.keys()):
